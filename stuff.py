@@ -31,19 +31,12 @@ edges_df['time_difference_target'] = edges_df['timeStamp'] - edges_df['createdTi
 edges_df['time_difference_source'] = edges_df['time_difference_source'].apply(lambda x: max(x, 0))
 edges_df['time_difference_target'] = edges_df['time_difference_target'].apply(lambda x: max(x, 0))
 
-# Convert categorical features into numeric values (or use one-hot encoding for certain features)
-edges_df['node_type_source'] = edges_df['nodeType_source'].astype('category').cat.codes
-edges_df['node_type_target'] = edges_df['nodeType_target'].astype('category').cat.codes
+app_name_counts = edges_df['appName_source'].value_counts().to_dict()
+edges_df['appName_source_freq'] = edges_df['appName_source'].map(app_name_counts)
 
-edges_df['appName_source'] = edges_df['appName_source'].astype('category').cat.codes
-edges_df['appName_target'] = edges_df['appName_target'].astype('category').cat.codes
-
-edges_df['version_source'] = edges_df['version_source'].astype('category').cat.codes
-edges_df['version_target'] = edges_df['version_target'].astype('category').cat.codes
-
-# Optional: Add any other feature processing, e.g., binary encoding for 'isClientSecretManaged', etc.
-edges_df['isClientSecretManaged_source'] = edges_df['isClientSecretManaged_source'].astype(int)
-edges_df['isClientSecretManaged_target'] = edges_df['isClientSecretManaged_target'].astype(int)
+app_name_counts = edges_df['appName_target'].value_counts().to_dict()
+edges_df['appName_target_freq'] = edges_df['appName_target'].map(app_name_counts)
+edges_df.drop(['appName_source', 'appName_target'], axis=1, inplace=True)
 
 # Step 2: Create features and labels (assuming you have a label column for link prediction)
 # If you don't have labels, you can assume all links are positive (1) or generate negative samples.

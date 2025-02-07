@@ -48,10 +48,16 @@ train_edges = edges_df[edges_df['timeStamp'] < edges_df['timeStamp'].quantile(0.
 test_edges = edges_df[edges_df['timeStamp'] >= edges_df['timeStamp'].quantile(0.8)]
 
 # Generate negative samples (non-existent edges)
-all_possible_edges = set(combinations(nodes_df['nodeId'], 2))
+negative_edges = []
+node_ids = nodes_df['nodeId'].tolist()
 existing_edges = set(zip(edges_df['sourceId'], edges_df['targetId']))
-negative_edges = list(all_possible_edges - existing_edges)
-negative_edges = np.random.choice(len(negative_edges), len(edges_df), replace=False)
+
+while len(negative_edges) < len(edges_df):  
+    src, tgt = np.random.choice(node_ids, 2, replace=False)  
+    if (src, tgt) not in existing_edges:  
+        negative_edges.append((src, tgt))
+
+negative_edges = np.array(negative_edges)
 
 def create_edge_tensor(df):
     return torch.tensor(df[['sourceId', 'targetId']].values.T, dtype=torch.long)

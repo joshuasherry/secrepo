@@ -77,10 +77,10 @@ def prepare_training_data(node_embeddings, pos_edges, neg_edges):
 # ---------------------------
 # 5. Train GraphSAGE
 # ---------------------------
-def train_graphsage(node_features, edge_index, epochs=100, lr=0.01):
+def train_graphsage(node_features, edge_index, pos_edges, neg_edges, epochs=100, lr=0.01):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = GraphSAGE(node_features.size(1), 64, 32).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=5e-4)
     
     node_features = node_features.to(device)
     edge_index = edge_index.to(device)
@@ -88,17 +88,37 @@ def train_graphsage(node_features, edge_index, epochs=100, lr=0.01):
     model.train()
     for epoch in range(epochs):
         optimizer.zero_grad()
+        
+        # Get embeddings from the model
         embeddings = model(node_features, edge_index)
-        loss = torch.norm(embeddings)  # L2 regularization (can be modified for supervised tasks)
+        
+        # Prepare positive and negative edges for link prediction
+        pos_edge_tensors = torch.tensor(pos_edges, dtype=torch.long, device=device).T
+        neg_edge_tensors = torch.tensor(neg_edges, dtype=torch.long, device=device).T
+
+        # Compute positive and negative similarities (dot product)
+        pos_scores = (embeddings[pos_edge_tensors[0]] * embeddings[pos_edge_tensors[1]]).sum(dim=1)
+        neg_scores = (embeddings[neg_edge_tensors[0]] * embeddings[neg_edge_tensors[1]]).sum(dim=1)
+        
+        # Labels: 1 for positive edges, 0 for negative edges
+        labels = torch.cat([torch.ones(pos_scores.size(0)), torch.zeros(neg_scores.size(0))]).to(device)
+        scores = torch.cat([pos_scores, neg_scores])
+        
+        # Use Binary Cross-Entropy with logits
+        loss = F.binary_cross_entropy_with_logits(scores, labels)
+        
         loss.backward()
         optimizer.step()
+
         if epoch % 10 == 0:
             print(f'Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}')
     
     model.eval()
     with torch.no_grad():
         final_embeddings = model(node_features, edge_index).cpu().numpy()
+    
     return final_embeddings
+
 
 # ---------------------------
 # 6. Main

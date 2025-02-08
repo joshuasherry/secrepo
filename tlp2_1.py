@@ -131,53 +131,56 @@ def main():
     print("Loading data...")
     node_features, edge_index, edges_df, node_index_map = load_data(nodes_file, edges_file)
     
-    print("Training GraphSAGE to learn node embeddings...")
-    embeddings = train_graphsage(node_features, edge_index)
-    
     # Set a cutoff timestamp for training/test split
     cutoff_timestamp = edges_df['timestamp'].quantile(0.8)
     
-    # Positive edges for training (edges before cutoff)
+    # Training set: edges before the cutoff
     training_edges = edges_df[edges_df['timestamp'] <= cutoff_timestamp][['sourceId', 'targetId']].values
-    pos_edges = [(row[0], row[1]) for row in training_edges]
+    pos_edges_train = [(row[0], row[1]) for row in training_edges]
     
-    # Negative sampling
-    positive_edges_set = set(pos_edges)
-    neg_edges = sample_negative_edges(len(pos_edges), list(node_index_map.values()), positive_edges_set)
+    # Testing set: edges after the cutoff
+    test_edges = edges_df[edges_df['timestamp'] > cutoff_timestamp][['sourceId', 'targetId']].values
+    pos_edges_test = [(row[0], row[1]) for row in test_edges]
     
-    # Prepare training data (features and labels)
+    # Generate negative edges
+    positive_edges_set = set(pos_edges_train)  # Use training edges only to prevent data leakage
+    neg_edges_train = sample_negative_edges(len(pos_edges_train), list(node_index_map.values()), positive_edges_set)
+    neg_edges_test = sample_negative_edges(len(pos_edges_test), list(node_index_map.values()), positive_edges_set)
+    
+    print("Training GraphSAGE to learn node embeddings...")
+    embeddings = train_graphsage(node_features, edge_index, pos_edges_train, neg_edges_train)
+
+    # Prepare training data for logistic regression
     print("Preparing training data...")
-    X_train, y_train = prepare_training_data(embeddings, pos_edges, neg_edges)
-    
+    X_train, y_train = prepare_training_data(embeddings, pos_edges_train, neg_edges_train)
+
     # Train a logistic regression classifier
     print("Training classifier...")
     clf = LogisticRegression(max_iter=1000)
     clf.fit(X_train, y_train)
-    train_probs = clf.predict_proba(X_train)[:, 1]
-    auc = roc_auc_score(y_train, train_probs)
-    print(f"Training AUC: {auc:.4f}")
     
-    # Predict future links (edges after the cutoff timestamp)
-    test_edges = edges_df[edges_df['timestamp'] > cutoff_timestamp][['sourceId', 'targetId']].values
-    test_pos_edges = [(row[0], row[1]) for row in test_edges]
+    # Evaluate on training data
+    train_probs = clf.predict_proba(X_train)[:, 1]
+    train_auc = roc_auc_score(y_train, train_probs)
+    print(f"Training AUC: {train_auc:.4f}")
     
     # Prepare test data
-    neg_test_edges = sample_negative_edges(len(test_pos_edges), list(node_index_map.values()), positive_edges_set)
-    X_test, y_test = prepare_training_data(embeddings, test_pos_edges, neg_test_edges)
-    
+    print("Preparing test data...")
+    X_test, y_test = prepare_training_data(embeddings, pos_edges_test, neg_edges_test)
+
     print("Predicting on test data...")
     test_probs = clf.predict_proba(X_test)[:, 1]
     test_auc = roc_auc_score(y_test, test_probs)
     print(f"Test AUC: {test_auc:.4f}")
-    
+
     # Output top predictions
     top_k = 50
     top_indices = np.argsort(test_probs)[-top_k:][::-1]
     print(f"\nTop {top_k} predicted future links:")
     for idx in top_indices:
-        u, v = test_pos_edges[idx]
+        u, v = pos_edges_test[idx]
         score = test_probs[idx]
         print(f"Edge {u} - {v} with predicted score {score:.4f}")
-
+        
 if __name__ == '__main__':
     main()

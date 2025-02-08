@@ -100,12 +100,15 @@ def train_graphsage(node_features, edge_index, pos_edges, neg_edges, epochs=100,
         pos_scores = (embeddings[pos_edge_tensors[0]] * embeddings[pos_edge_tensors[1]]).sum(dim=1)
         neg_scores = (embeddings[neg_edge_tensors[0]] * embeddings[neg_edge_tensors[1]]).sum(dim=1)
         
+        pos_probs = torch.sigmoid(pos_scores)
+        neg_probs = torch.sigmoid(neg_scores)
+
         # Labels: 1 for positive edges, 0 for negative edges
-        labels = torch.cat([torch.ones(pos_scores.size(0)), torch.zeros(neg_scores.size(0))]).to(device)
-        scores = torch.cat([pos_scores, neg_scores])
-        
-        # Use Binary Cross-Entropy with logits
-        loss = F.binary_cross_entropy_with_logits(scores, labels)
+        labels = torch.cat([torch.ones(pos_probs.size(0)), torch.zeros(neg_probs.size(0))]).to(device)
+        probs = torch.cat([pos_probs, neg_probs])
+
+        # **Fix: Use BCE Loss Directly on Probabilities**
+        loss = F.binary_cross_entropy(probs, labels)
         
         loss.backward()
         optimizer.step()

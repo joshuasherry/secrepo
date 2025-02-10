@@ -50,6 +50,30 @@ class GraphSAGE(torch.nn.Module):
         x = self.conv2(x, edge_index)
         return x
 
+
+def train_xgboost(X_train, y_train, X_test, y_test):
+    model = xgb.XGBClassifier(
+        n_estimators=100,
+        max_depth=6,
+        learning_rate=0.1,
+        objective='binary:logistic',
+        use_label_encoder=False,
+        eval_metric='logloss'
+    )
+    
+    model.fit(X_train, y_train)
+    
+    train_probs = model.predict_proba(X_train)[:, 1]
+    test_probs = model.predict_proba(X_test)[:, 1]
+    
+    train_auc = roc_auc_score(y_train, train_probs)
+    test_auc = roc_auc_score(y_test, test_probs)
+    
+    print(f"XGBoost Training AUC: {train_auc:.4f}")
+    print(f"XGBoost Test AUC: {test_auc:.4f}")
+    
+    return model, test_probs
+    
 # ---------------------------
 # 3. Sampling Negative Edges
 # ---------------------------
@@ -159,8 +183,7 @@ def main():
 
     # Train a logistic regression classifier
     print("Training classifier...")
-    clf = LogisticRegression(max_iter=1000)
-    clf.fit(X_train, y_train)
+    clf = train_xgboost(X_train, y_train, X_test, y_test)
     
     # Evaluate on training data
     train_probs = clf.predict_proba(X_train)[:, 1]

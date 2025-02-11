@@ -9,9 +9,21 @@ df = pd.read_csv('your_file.csv')
 # Ensure Category column is string type
 df['Category'] = df['Category'].astype(str)
 
+
+def split_category(category):
+    # Split by hyphens
+    words = category.replace("-", " ").split()
+    # Split CamelCase words
+    split_words = []
+    for word in words:
+        split_words += re.sub(r'([a-z])([A-Z])', r'\1 \2', word).split()
+    return split_words
+
 # Train Word2Vec model on single-word categories (or split multi-word categories)
 sentences = [[word] for word in df['Category'].unique()]  # Each category as a "sentence"
 w2v_model = Word2Vec(sentences, vector_size=10, window=5, min_count=1, workers=4)
+
+
 
 # Generate category vectors
 category_vectors = np.array([w2v_model.wv[word] for word in df['Category'].unique() if word in w2v_model.wv])

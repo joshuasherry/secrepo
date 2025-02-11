@@ -27,3 +27,8 @@ def train_xgboost(X_train, y_train, X_test, y_test):
 
 # Modify your main function to use this instead of logistic regression:
 # clf = train_xgboost(X_train, y_train, X_test, y_test)
+
+
+x = F.relu(self.conv1(x, edge_index))
+x = F.dropout(x, p=0.5, training=self.training)  # Add dropout
+x = self.conv2(x, edge_index)

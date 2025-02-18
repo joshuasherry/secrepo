@@ -1,6 +1,12 @@
 import networkx as nx
 import pandas as pd
 import numpy as np
+import gym
+from gym import spaces
+import random
+from stable_baselines3 import DQN
+import matplotlib.pyplot as plt
+
 
 # Load temporal dataset (Example: timestamped edges)
 df = pd.read_csv("email-Eu-core-temporal.txt", sep=" ", names=["node1", "node2", "timestamp"])
@@ -14,9 +20,6 @@ time_splits = np.array_split(df, 10)  # Create 10-time slices
 # Create dynamic graphs for each time slice
 graphs = [nx.from_pandas_edgelist(t, "node1", "node2") for t in time_splits]
 
-import gym
-from gym import spaces
-import random
 
 class TemporalLinkPredictionEnv(gym.Env):
     def __init__(self, graphs):
@@ -61,9 +64,6 @@ class TemporalLinkPredictionEnv(gym.Env):
     def render(self, mode="human"):
         pass
 
-
-from stable_baselines3 import DQN
-
 # Create environment
 env = TemporalLinkPredictionEnv(graphs)
 
@@ -89,8 +89,6 @@ for _ in range(len(graphs) - 1):
         break
 
 print("Total Reward (Prediction Accuracy Score):", total_rewards)
-
-import matplotlib.pyplot as plt
 
 pred_graph = nx.Graph()
 for _ in range(100):  # Predict 100 times
